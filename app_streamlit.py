@@ -96,29 +96,40 @@ with tab1:
 # =========================================================
 with tab2:
 
+    from docx import Document
+    from fpdf import FPDF
+
     uploaded_docx = st.file_uploader("Upload Word file", type="docx")
 
     if uploaded_docx:
         if st.button("Convert to PDF"):
 
             doc = Document(uploaded_docx)
+
             pdf = FPDF()
             pdf.add_page()
 
+            # 🔥 Unicode font (fix for special characters)
+            pdf.add_font("DejaVu", "", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", uni=True)
+            pdf.set_font("DejaVu", size=12)
+
             for para in doc.paragraphs:
-                pdf.set_font("Arial", size=12)
-                pdf.multi_cell(0, 8, para.text)
+                text = para.text.strip()
+                if text:
+                    pdf.multi_cell(0, 8, text)
 
             pdf_output = BytesIO()
             pdf.output(pdf_output)
             pdf_output.seek(0)
 
             st.download_button(
-                "Download PDF",
+                "⬇️ Download PDF",
                 pdf_output,
                 "converted.pdf",
                 mime="application/pdf"
             )
+
+            st.success("✅ Conversion successful!")
 
 # =========================================================
 # 🔗 MERGE PDF
