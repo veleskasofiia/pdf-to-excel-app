@@ -14,7 +14,7 @@ st.set_page_config(page_title="PDF Tools", page_icon="📊", layout="wide")
 st.markdown("<h1 style='text-align:center;'>PDF Tools</h1>", unsafe_allow_html=True)
 
 # 🔥 Tabs
-tab1, tab2, tab3 = st.tabs(["📊 PDF to Excel", "📄 Word to PDF", "🔗 Merge PDFs"])
+tab1, tab2, tab3 = st.tabs(["📊 PDF to Excel", "🔗 Merge PDFs"])
 
 # =========================================================
 # 📊 PDF → EXCEL (YOUR WORKING LOGIC)
@@ -92,71 +92,24 @@ with tab1:
             st.download_button("Download Excel", output, "output.xlsx")
 
 # =========================================================
-# 📄 WORD → PDF
-# =========================================================
-with tab2:
-
-    from docx import Document
-    from fpdf import FPDF
-    import os
-    from io import BytesIO
-
-    uploaded_docx = st.file_uploader("Upload Word file", type="docx")
-
-    if uploaded_docx:
-        if st.button("Convert to PDF"):
-
-            doc = Document(uploaded_docx)
-
-            pdf = FPDF()
-            pdf.add_page()
-
-            # ✅ font path (file must be in repo)
-            font_path = os.path.join(os.getcwd(), "DejaVuSans.ttf")
-
-            pdf.add_font("DejaVu", "", font_path)
-            pdf.set_font("DejaVu", size=12)
-
-            for para in doc.paragraphs:
-                text = para.text.strip()
-                if text:
-                    pdf.multi_cell(0, 8, text)
-
-            pdf_output = BytesIO()
-            pdf.output(pdf_output)
-            pdf_output.seek(0)
-
-            st.download_button(
-                "⬇️ Download PDF",
-                pdf_output,
-                "converted.pdf",
-                mime="application/pdf"
-            )
-
-            st.success("✅ Conversion successful!")
-# =========================================================
 # 🔗 MERGE PDF
 # =========================================================
-with tab3:
+import streamlit as st
+from PyPDF2 import PdfMerger
+from io import BytesIO
 
-    uploaded_pdfs = st.file_uploader("Upload multiple PDFs", type="pdf", accept_multiple_files=True)
+st.title("Merge PDFs")
 
-    if uploaded_pdfs:
-        if st.button("Merge PDFs"):
+uploaded_files = st.file_uploader("Upload PDFs", accept_multiple_files=True, type="pdf")
 
-            merger = PdfMerger()
+if uploaded_files:
+    merger = PdfMerger()
+    for uploaded_file in uploaded_files:
+        merger.append(uploaded_file)
 
-            for pdf_file in uploaded_pdfs:
-                merger.append(pdf_file)
+    output = BytesIO()
+    merger.write(output)
+    merger.close()
+    output.seek(0)
 
-            output = BytesIO()
-            merger.write(output)
-            merger.close()
-            output.seek(0)
-
-            st.download_button(
-                "Download merged PDF",
-                output,
-                "merged.pdf",
-                mime="application/pdf"
-            )
+    st.download_button("Download Merged PDF", data=output, file_name="merged.pdf")
