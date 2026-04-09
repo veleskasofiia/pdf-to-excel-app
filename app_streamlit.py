@@ -109,8 +109,8 @@ with tab2:
             pdf = FPDF()
             pdf.add_page()
 
-            # 🔥 Unicode font (fix for special characters)
-            pdf.add_font("DejaVu", "", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", uni=True)
+            # ✅ LOCAL FONT (IMPORTANT)
+            pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
             pdf.set_font("DejaVu", size=12)
 
             for para in doc.paragraphs:
