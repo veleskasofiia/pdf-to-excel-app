@@ -98,6 +98,8 @@ with tab2:
 
     from docx import Document
     from fpdf import FPDF
+    import os
+    from io import BytesIO
 
     uploaded_docx = st.file_uploader("Upload Word file", type="docx")
 
@@ -109,8 +111,10 @@ with tab2:
             pdf = FPDF()
             pdf.add_page()
 
-            # ✅ LOCAL FONT (IMPORTANT)
-            pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+            # ✅ font path (file must be in repo)
+            font_path = os.path.join(os.getcwd(), "DejaVuSans.ttf")
+
+            pdf.add_font("DejaVu", "", font_path)
             pdf.set_font("DejaVu", size=12)
 
             for para in doc.paragraphs:
@@ -130,7 +134,6 @@ with tab2:
             )
 
             st.success("✅ Conversion successful!")
-
 # =========================================================
 # 🔗 MERGE PDF
 # =========================================================
