@@ -30,143 +30,94 @@ DEBUG = False
 
 if uploaded_file and convert:
     st.info("Processing your file... ⏳")
-    all_tables = []
+    data = []
 
     with pdfplumber.open(uploaded_file) as pdf:
-        for page_num, page in enumerate(pdf.pages, start=1):
+        for page in pdf.pages:
+            text = page.extract_text()
+            if not text:
+                continue
 
-            tables = page.extract_tables()
+            lines = text.split("\n")
 
-            # 🔥 FIRST: try table extraction
-            if tables:
-                for t in tables:
-                    df = pd.DataFrame(t)
+            current_item = None
+            current_descriptions = []
 
-                    # 🔥 FIX: if only ONE column → split it
-                    if df.shape[1] == 1:
-                        fixed_rows = []
-
-                        for row in df[0]:
-                            if not row:
-                                continue
-
-                            parts = row.split()
-
-                            if len(parts) < 6:
-                                continue
-
-                            try:
-                                line_no = parts[0]
-                                date = parts[1]
-                                item_id = parts[2]
-                                qty = parts[-4]
-                                unit = parts[-3]
-                                price = parts[-2].replace("$","").replace(",","")
-                                amount = parts[-1].replace("$","").replace(",","")
-
-                                description = " ".join(parts[3:-4])
-
-                                fixed_rows.append([
-                                    line_no, date, item_id, description, qty, unit, price, amount
-                                ])
-
-                            except:
-                                if DEBUG:
-                                    st.write("Skipped table row:", row)
-
-                        if fixed_rows:
-                            df = pd.DataFrame(fixed_rows, columns=[
-                                "Line","Date","ItemID","Description","Qty","Unit","Price","Amount"
-                            ])
-
-                    df['Page'] = page_num
-                    all_tables.append(df)
-
-            # 🔥 SECOND: fallback text parsing
-            else:
-                text = page.extract_text()
-                if not text:
+            for line in lines:
+                line = line.strip()
+                if not line:
                     continue
 
-                lines = text.split("\n")
-                current_item = None
-                current_descriptions = []
-                data = []
+                parts = line.split()
 
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
+                # ✅ ONLY your working logic
+                if len(parts) > 5 and parts[0].isdigit():
 
-                    parts = line.split()
+                    if current_item:
+                        row = current_item + current_descriptions
+                        data.append(row)
 
-                    if len(parts) > 5 and parts[0].isdigit():
+                    try:
+                        line_no = parts[0]
+                        date = parts[1]
+                        item_id = parts[2]
+                        qty = parts[-4]
+                        unit = parts[-3]
+                        price = parts[-2].replace("$","").replace(",","")
+                        amount = parts[-1].replace("$","").replace(",","")
 
-                        if current_item:
-                            row = current_item + current_descriptions
-                            data.append(row)
+                        description = " ".join(parts[3:-4]).strip()
 
-                        try:
-                            line_no, date, item_id = parts[0], parts[1], parts[2]
-                            qty = parts[-4]
-                            unit = parts[-3]
-                            price = parts[-2].replace("$","").replace(",","")
-                            amount = parts[-1].replace("$","").replace(",","")
+                        current_item = [line_no, date, item_id, qty, unit, price, amount]
+                        current_descriptions = [description] if description else []
 
-                            description = " ".join(parts[3:-4]).strip()
+                    except:
+                        if DEBUG:
+                            st.write("Skipped line:", line)
+                        current_item = None
+                        current_descriptions = []
 
-                            current_item = [line_no, date, item_id, qty, unit, price, amount]
-                            current_descriptions = [description] if description else []
+                else:
+                    # ✅ multi-line description support
+                    if current_item:
+                        current_descriptions.append(line)
 
-                        except:
-                            if DEBUG:
-                                st.write("Skipped line:", line)
-                            current_item, current_descriptions = None, []
+            # Save last row
+            if current_item:
+                row = current_item + current_descriptions
+                data.append(row)
 
-                    else:
-                        if current_item:
-                            current_descriptions.append(line)
+    # ✅ Create DataFrame
+    if data:
+        max_desc = max(len(r) - 7 for r in data)
 
-                if current_item:
-                    row = current_item + current_descriptions
-                    data.append(row)
+        columns = ["Line","Date","ItemID","Qty","Unit","Price","Amount"]
+        columns += [f"Desc{i+1}" for i in range(max_desc)]
 
-                if data:
-                    max_desc = max(len(r)-7 for r in data)
-                    columns = ["Line","Date","ItemID","Qty","Unit","Price","Amount"] + [f"Desc{i+1}" for i in range(max_desc)]
+        for r in data:
+            while len(r) < len(columns):
+                r.append("")
 
-                    for r in data:
-                        while len(r) < len(columns):
-                            r.append("")
-
-                    all_tables.append(pd.DataFrame(data, columns=columns))
-
-    # 🔥 Combine all tables
-    if all_tables:
-        final_df = pd.concat(all_tables, ignore_index=True)
+        df = pd.DataFrame(data, columns=columns)
 
         st.success("✅ Conversion successful!")
 
-        # 🔹 Column rename feature
+        # 🔹 Column rename
         st.subheader("🛠 Customize Columns")
         new_columns = {}
-        for col in final_df.columns:
+        for col in df.columns:
             new_name = st.text_input(f"Rename '{col}'", value=col)
             new_columns[col] = new_name
 
-        final_df.rename(columns=new_columns, inplace=True)
+        df.rename(columns=new_columns, inplace=True)
 
-        # 🔥 Bigger editable table
+        # 🔥 BIG table
         st.subheader("📊 Preview")
-        st.data_editor(
-            final_df,
-            use_container_width=True,
-            height=600
-        )
+        st.data_editor(df, use_container_width=True, height=600)
 
         # 📥 Download
         output = BytesIO()
-        final_df.to_excel(output, index=False)
+        df.to_excel(output, index=False)
         output.seek(0)
 
         st.download_button(
@@ -177,4 +128,4 @@ if uploaded_file and convert:
         )
 
     else:
-        st.error("❌ No tables found in PDF")
+        st.error("❌ No valid rows found in PDF")
