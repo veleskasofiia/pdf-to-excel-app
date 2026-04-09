@@ -2,130 +2,147 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 from io import BytesIO
+from PyPDF2 import PdfMerger
+from docx import Document
+from fpdf import FPDF
+import tempfile
+import os
 
-# ✅ Page config
-st.set_page_config(
-    page_title="PDF to Excel",
-    page_icon="📊",
-    layout="wide"
-)
+# ✅ Config
+st.set_page_config(page_title="PDF Tools", page_icon="📊", layout="wide")
 
-# 🔹 Styling
-st.markdown("""
-<style>
-.main-title { text-align: center; font-size: 42px; font-weight: bold; color: #ff4b4b; }
-.sub-text { text-align: center; color: #666; margin-bottom: 30px; }
-.stButton button { background-color: #ff4b4b; color: white; border-radius: 8px; height: 50px; width: 100%; font-size: 16px; }
-</style>
-""", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;'>PDF Tools</h1>", unsafe_allow_html=True)
 
-# 🔹 Header
-st.markdown('<div class="main-title">PDF to Excel</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-text">Upload your PDF and convert it instantly</div>', unsafe_allow_html=True)
+# 🔥 Tabs
+tab1, tab2, tab3 = st.tabs(["📊 PDF to Excel", "📄 Word to PDF", "🔗 Merge PDFs"])
 
-# 🔹 Upload
-uploaded_file = st.file_uploader("📄 Drag & drop your PDF here", type="pdf")
-convert = st.button("Convert to Excel")
-DEBUG = False
+# =========================================================
+# 📊 PDF → EXCEL (YOUR WORKING LOGIC)
+# =========================================================
+with tab1:
 
-if uploaded_file and convert:
-    st.info("Processing your file... ⏳")
-    data = []
+    uploaded_file = st.file_uploader("Upload PDF", type="pdf")
+    convert = st.button("Convert to Excel")
 
-    with pdfplumber.open(uploaded_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if not text:
-                continue
+    if uploaded_file and convert:
+        data = []
 
-            lines = text.split("\n")
-
-            current_item = None
-            current_descriptions = []
-
-            for line in lines:
-                line = line.strip()
-                if not line:
+        with pdfplumber.open(uploaded_file) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
                     continue
 
-                parts = line.split()
+                lines = text.split("\n")
+                current_item = None
+                current_descriptions = []
 
-                # ✅ ONLY your working logic
-                if len(parts) > 5 and parts[0].isdigit():
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
 
-                    if current_item:
-                        row = current_item + current_descriptions
-                        data.append(row)
+                    parts = line.split()
 
-                    try:
-                        line_no = parts[0]
-                        date = parts[1]
-                        item_id = parts[2]
-                        qty = parts[-4]
-                        unit = parts[-3]
-                        price = parts[-2].replace("$","").replace(",","")
-                        amount = parts[-1].replace("$","").replace(",","")
+                    if len(parts) > 5 and parts[0].isdigit():
 
-                        description = " ".join(parts[3:-4]).strip()
+                        if current_item:
+                            data.append(current_item + current_descriptions)
 
-                        current_item = [line_no, date, item_id, qty, unit, price, amount]
-                        current_descriptions = [description] if description else []
+                        try:
+                            line_no, date, item_id = parts[0], parts[1], parts[2]
+                            qty = parts[-4]
+                            unit = parts[-3]
+                            price = parts[-2].replace("$","").replace(",","")
+                            amount = parts[-1].replace("$","").replace(",","")
 
-                    except:
-                        if DEBUG:
-                            st.write("Skipped line:", line)
-                        current_item = None
-                        current_descriptions = []
+                            description = " ".join(parts[3:-4])
 
-                else:
-                    # ✅ multi-line description support
-                    if current_item:
-                        current_descriptions.append(line)
+                            current_item = [line_no, date, item_id, qty, unit, price, amount]
+                            current_descriptions = [description] if description else []
 
-            # Save last row
-            if current_item:
-                row = current_item + current_descriptions
-                data.append(row)
+                        except:
+                            current_item = None
+                            current_descriptions = []
 
-    # ✅ Create DataFrame
-    if data:
-        max_desc = max(len(r) - 7 for r in data)
+                    else:
+                        if current_item:
+                            current_descriptions.append(line)
 
-        columns = ["Line","Date","ItemID","Qty","Unit","Price","Amount"]
-        columns += [f"Desc{i+1}" for i in range(max_desc)]
+                if current_item:
+                    data.append(current_item + current_descriptions)
 
-        for r in data:
-            while len(r) < len(columns):
-                r.append("")
+        if data:
+            max_desc = max(len(r) - 7 for r in data)
+            columns = ["Line","Date","ItemID","Qty","Unit","Price","Amount"]
+            columns += [f"Desc{i+1}" for i in range(max_desc)]
 
-        df = pd.DataFrame(data, columns=columns)
+            for r in data:
+                while len(r) < len(columns):
+                    r.append("")
 
-        st.success("✅ Conversion successful!")
+            df = pd.DataFrame(data, columns=columns)
 
-        # 🔹 Column rename
-        st.subheader("🛠 Customize Columns")
-        new_columns = {}
-        for col in df.columns:
-            new_name = st.text_input(f"Rename '{col}'", value=col)
-            new_columns[col] = new_name
+            st.data_editor(df, use_container_width=True, height=600)
 
-        df.rename(columns=new_columns, inplace=True)
+            output = BytesIO()
+            df.to_excel(output, index=False)
+            output.seek(0)
 
-        # 🔥 BIG table
-        st.subheader("📊 Preview")
-        st.data_editor(df, use_container_width=True, height=600)
+            st.download_button("Download Excel", output, "output.xlsx")
 
-        # 📥 Download
-        output = BytesIO()
-        df.to_excel(output, index=False)
-        output.seek(0)
+# =========================================================
+# 📄 WORD → PDF
+# =========================================================
+with tab2:
 
-        st.download_button(
-            "⬇️ Download Excel",
-            output,
-            "output.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    uploaded_docx = st.file_uploader("Upload Word file", type="docx")
 
-    else:
-        st.error("❌ No valid rows found in PDF")
+    if uploaded_docx:
+        if st.button("Convert to PDF"):
+
+            doc = Document(uploaded_docx)
+            pdf = FPDF()
+            pdf.add_page()
+
+            for para in doc.paragraphs:
+                pdf.set_font("Arial", size=12)
+                pdf.multi_cell(0, 8, para.text)
+
+            pdf_output = BytesIO()
+            pdf.output(pdf_output)
+            pdf_output.seek(0)
+
+            st.download_button(
+                "Download PDF",
+                pdf_output,
+                "converted.pdf",
+                mime="application/pdf"
+            )
+
+# =========================================================
+# 🔗 MERGE PDF
+# =========================================================
+with tab3:
+
+    uploaded_pdfs = st.file_uploader("Upload multiple PDFs", type="pdf", accept_multiple_files=True)
+
+    if uploaded_pdfs:
+        if st.button("Merge PDFs"):
+
+            merger = PdfMerger()
+
+            for pdf_file in uploaded_pdfs:
+                merger.append(pdf_file)
+
+            output = BytesIO()
+            merger.write(output)
+            merger.close()
+            output.seek(0)
+
+            st.download_button(
+                "Download merged PDF",
+                output,
+                "merged.pdf",
+                mime="application/pdf"
+            )

@@ -1,4 +1,7 @@
 streamlit
-pandas
 pdfplumber
+pandas
 openpyxl
+python-docx
+fpdf
+PyPDF2
