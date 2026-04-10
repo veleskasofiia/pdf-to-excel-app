@@ -29,7 +29,7 @@ uploaded_file = st.file_uploader("📄 Drag & drop your PDF here", type="pdf")
 convert = st.button("Convert to Excel")
 
 # 🔹 Debug switch
-DEBUG = False
+DEBUG = False 
 
 # 🔹 JS spinner / alert
 if convert and uploaded_file:
