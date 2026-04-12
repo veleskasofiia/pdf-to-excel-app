@@ -4,7 +4,7 @@ import pandas as pd
 import time
 
 # Page config
-st.set_page_config(page_title="PDF to Excel", layout="centered")
+st.set_page_config(page_title="Epic PO to Excel", layout="centered")
 
 # 🔹 Custom styling
 st.markdown("""
