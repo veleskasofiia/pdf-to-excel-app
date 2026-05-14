@@ -15,12 +15,24 @@ st.markdown("""
 
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+/* Force white background everywhere */
+.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+    background-color: #ffffff !important;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #f9fafb !important;
 }
 
 .block-container {
     padding-top: 2.5rem;
     padding-bottom: 2.5rem;
     max-width: 720px;
+    background-color: #ffffff !important;
 }
 
 /* Header */
@@ -31,7 +43,7 @@ html, body, [class*="css"] {
 .app-title {
     font-size: 2.2rem;
     font-weight: 700;
-    color: #1a1a2e;
+    color: #111827;
     letter-spacing: -0.5px;
     margin-bottom: 0.3rem;
 }
@@ -112,7 +124,7 @@ html, body, [class*="css"] {
 .metric-value {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #1a1a2e;
+    color: #111827;
 }
 .metric-label {
     font-size: 0.75rem;
