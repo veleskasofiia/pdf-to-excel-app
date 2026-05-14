@@ -262,8 +262,8 @@ if uploaded_file and convert:
                         price = parts[-2].replace("$", "").replace(",", "")
                         amount = parts[-1].replace("$", "").replace(",", "")
                         description = " ".join(parts[3:-4]).strip()
-                        current_item = [line_no, date, item_id, qty, unit, price, amount]
-                        current_descriptions = [description] if description else []
+                        current_item = [line_no, item_id, description, qty, date, unit, price, amount]
+                        current_descriptions = []
                     except Exception as e:
                         if DEBUG:
                             st.write("Skipped line:", line)
@@ -278,9 +278,9 @@ if uploaded_file and convert:
 
     # Output
     if data:
-        max_desc = max(len(r) - 7 for r in data)
-        columns = ["Line", "Date", "ItemID", "Qty", "Unit", "Price", "Amount"]
-        columns += [f"Desc{i+1}" for i in range(max_desc)]
+        max_desc = max(len(r) - 8 for r in data)
+        columns = ["Line", "assy", "assy name", "assy qty", "date", "Unit", "Price", "Amount"]
+        columns += [f"Desc{i+2}" for i in range(max_desc)]
         for r in data:
             while len(r) < len(columns):
                 r.append("")
