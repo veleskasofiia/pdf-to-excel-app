@@ -5,6 +5,31 @@ import zipfile
 import io
 import time
 
+try:
+    from office365.runtime.auth.user_credential import UserCredential
+    from office365.sharepoint.client_context import ClientContext
+    SP_AVAILABLE = True
+except ImportError:
+    SP_AVAILABLE = False
+
+SHAREPOINT_SITE = "https://blanik1.sharepoint.com/sites/DataExport"
+SHAREPOINT_FILE = "/sites/DataExport/Shared Documents/PO_LIST_EPIC_COPY/PO_LIST_EPIC.xlsx"
+SHAREPOINT_FOLDER = "/sites/DataExport/Shared Documents/PO_LIST_EPIC_COPY"
+
+def push_to_sharepoint(df_push, email, password):
+    ctx = ClientContext(SHAREPOINT_SITE).with_credentials(UserCredential(email, password))
+    file_content = io.BytesIO()
+    ctx.web.get_file_by_server_relative_url(SHAREPOINT_FILE).download(file_content).execute_query()
+    file_content.seek(0)
+    existing_df = pd.read_excel(file_content)
+    updated_df = pd.concat([existing_df, df_push], ignore_index=True)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        updated_df.to_excel(writer, index=False)
+    ctx.web.get_folder_by_server_relative_url(SHAREPOINT_FOLDER).upload_file(
+        "PO_LIST_EPIC.xlsx", output.getvalue()
+    ).execute_query()
+
 # Page config
 st.set_page_config(page_title="PO to Excel", layout="centered")
 
@@ -338,5 +363,42 @@ if uploaded_file and convert:
                 file_name="output.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+        # SharePoint section
+        st.markdown('<div class="section-label" style="margin-top:1.4rem;">Step 4 — Push to SharePoint (optional)</div>', unsafe_allow_html=True)
+
+        all_columns = df.columns.tolist()
+        selected_cols = st.multiselect(
+            "Select columns to push",
+            options=all_columns,
+            default=all_columns,
+            key="sp_cols"
+        )
+
+        try:
+            default_email = st.secrets["SP_EMAIL"]
+        except Exception:
+            default_email = ""
+        try:
+            default_password = st.secrets["SP_PASSWORD"]
+        except Exception:
+            default_password = ""
+
+        sp_email = st.text_input("Microsoft work email", value=default_email, key="sp_email")
+        sp_password = st.text_input("Password", type="password", value=default_password, key="sp_pass")
+
+        if st.button("Push to SharePoint"):
+            if not sp_email or not sp_password:
+                st.warning("Please enter your Microsoft work email and password.")
+            elif not selected_cols:
+                st.warning("Please select at least one column.")
+            elif not SP_AVAILABLE:
+                st.error("Office365 library not available. Check requirements.txt.")
+            else:
+                with st.spinner("Connecting to SharePoint..."):
+                    try:
+                        push_to_sharepoint(df[selected_cols], sp_email, sp_password)
+                        st.success("Data pushed to SharePoint successfully!")
+                    except Exception as e:
+                        st.error(f"SharePoint error: {e}")
     else:
         st.error("No data found in the PDF. Check that the file format matches the expected PO layout.")
